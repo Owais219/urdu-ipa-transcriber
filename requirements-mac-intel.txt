@@ -1,0 +1,16 @@
+# Intel (x86_64) Macs only. Use with Python 3.11 or 3.12.
+# PyTorch stopped publishing Intel-Mac builds after 2.2.2, and 2.2.2 was built
+# against NumPy 1.x; transformers 4.57 is the last line that accepts torch 2.2.
+torch==2.2.2
+numpy>=1.24,<2
+scipy>=1.10
+soundfile>=0.12
+sounddevice>=0.4.6
+PySide6>=6.5
+openpyxl>=3.1
+allosaurus==1.0.2
+transformers>=4.49,<4.58
+# allosaurus -> resampy -> numba/llvmlite: the last releases with Intel-Mac wheels
+# (newer ones try to compile LLVM from source and fail)
+numba==0.62.1
+llvmlite==0.45.1

@@ -1,0 +1,150 @@
+name: Build Intel-Mac app (DMG)
+
+on:
+  workflow_dispatch:
+    inputs:
+      whisper_model:
+        description: Hugging Face Whisper checkpoint to bundle
+        default: kingabzpro/whisper-large-v3-turbo-urdu
+  push:
+    branches: [main]
+    paths-ignore: ["**.md", "docs/**"]
+
+permissions:
+  contents: write
+
+env:
+  APP_VERSION: "0.2.0"
+  WHISPER_MODEL: ${{ github.event.inputs.whisper_model || 'kingabzpro/whisper-large-v3-turbo-urdu' }}
+  CT2_VERSION: "4.6.0"
+
+jobs:
+  convert-whisper:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache converted model
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: models/whisper-urdu-ct2
+          key: whisper-ct2-${{ env.WHISPER_MODEL }}-ct2${{ env.CT2_VERSION }}-int8-v1
+      - uses: actions/setup-python@v5
+        if: steps.cache.outputs.cache-hit != 'true'
+        with:
+          python-version: "3.12"
+      - name: Convert to CTranslate2 int8
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          pip install --index-url https://download.pytorch.org/whl/cpu torch
+          pip install "ctranslate2==${CT2_VERSION}" "transformers>=4.45,<4.58" "huggingface-hub<1.0" faster-whisper==1.2.1 safetensors
+          python packaging/convert_whisper.py "$WHISPER_MODEL" models/whisper-urdu-ct2 int8
+      - uses: actions/upload-artifact@v4
+        with:
+          name: whisper-urdu-ct2
+          path: models/whisper-urdu-ct2
+          retention-days: 3
+
+  build-mac-intel:
+    needs: convert-whisper
+    runs-on: macos-15-intel
+    timeout-minutes: 90
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          architecture: x64
+      - name: Machine
+        run: |
+          uname -m; sw_vers; sysctl -n machdep.cpu.brand_string; sysctl -n hw.physicalcpu hw.logicalcpu
+          python -c "import platform,sys;print(sys.version, platform.machine())"
+      - name: Install dependencies (pinned Intel-Mac wheels only)
+        run: |
+          python -m pip install --upgrade pip
+          pip install --only-binary=:all: --no-binary=unicodecsv -r packaging/requirements-build-mac-intel.txt
+          pip install --no-deps faster-whisper==1.2.1 allosaurus==1.0.2
+          python -c "import torch, numpy, ctranslate2, PySide6, scipy, panphon; print('torch', torch.__version__, 'numpy', numpy.__version__, 'ct2', ctranslate2.__version__, 'qt', PySide6.__version__)"
+      - name: Download phone model (Allosaurus uni2005)
+        run: |
+          python -c "from urdu_ipa import _resampy_compat as r; r.install(); from allosaurus.app import read_recognizer; read_recognizer('uni2005')"
+          ls -la "$(python -c 'import allosaurus,os;print(os.path.dirname(allosaurus.__file__))')/pretrained/uni2005"
+      - uses: actions/download-artifact@v4
+        with:
+          name: whisper-urdu-ct2
+          path: models/whisper-urdu-ct2
+      - name: Unit, pipeline and UI tests (source)
+        run: python -m pytest -q -p no:cacheprovider -W ignore tests
+      - name: Make a test recording with macOS speech (if a Hindi voice exists)
+        run: |
+          if say -v '?' | grep -q '^Lekha'; then
+            say -v Lekha -o word.aiff "फल" && afconvert -f WAVE -d LEI16@16000 word.aiff word.wav && echo "WAV=word.wav" >> "$GITHUB_ENV"
+          else
+            echo "no Hindi voice on this runner; the self-test will use a synthetic signal"
+          fi
+      - name: Self-test from source (real models)
+        run: python -m urdu_ipa --selftest ${WAV:+--wav "$WAV"} --json selftest-source.json
+      - name: Build app
+        run: |
+          pyinstaller --noconfirm --clean --distpath dist --workpath build packaging/UrduIPA.spec
+          codesign --force --deep --sign - "dist/Urdu IPA.app"
+          codesign --verify --deep --verbose=2 "dist/Urdu IPA.app"
+          du -sh "dist/Urdu IPA.app"
+          lipo -archs "dist/Urdu IPA.app/Contents/MacOS/UrduIPA"
+          plutil -p "dist/Urdu IPA.app/Contents/Info.plist" | grep -E "Microphone|Minimum|ShortVersion"
+      - name: Self-test of the packaged app
+        run: |
+          "dist/Urdu IPA.app/Contents/MacOS/UrduIPA" --selftest ${WAV:+--wav "$WAV"} --json selftest-app.json
+      - name: Launch the real app window for 40 s (must not crash)
+        env:
+          QT_QPA_PLATFORM: cocoa
+        run: |
+          rm -f ~/UrduIPA/logs/app.log
+          "dist/Urdu IPA.app/Contents/MacOS/UrduIPA" &
+          PID=$!
+          sleep 40
+          if kill -0 $PID 2>/dev/null; then echo "app still running after 40 s"; kill $PID; else echo "APP EXITED EARLY"; cat ~/UrduIPA/logs/app.log; exit 1; fi
+          echo "--- app.log ---"; cat ~/UrduIPA/logs/app.log || true
+      - name: Make DMG
+        run: |
+          mkdir -p dmgroot
+          cp -R "dist/Urdu IPA.app" dmgroot/
+          ln -s /Applications dmgroot/Applications
+          cp packaging/DMG_README.txt "dmgroot/Read Me First.txt"
+          for i in 1 2 3; do
+            hdiutil create -volname "Urdu IPA" -srcfolder dmgroot -fs HFS+ -format UDZO -imagekey zlib-level=6 -ov UrduIPA-Intel.dmg && break
+            sleep 10
+          done
+          hdiutil verify UrduIPA-Intel.dmg
+          ls -la UrduIPA-Intel.dmg
+          SIZE=$(stat -f%z UrduIPA-Intel.dmg); test "$SIZE" -lt 2000000000 || (echo "DMG too large for a release asset"; exit 1)
+          shasum -a 256 UrduIPA-Intel.dmg | tee UrduIPA-Intel.dmg.sha256
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: selftest-reports
+          path: |
+            selftest-*.json
+            ~/UrduIPA/logs/app.log
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v${APP_VERSION}-build${GITHUB_RUN_NUMBER}"
+          python - <<'PY' > notes.md
+          import json
+          r = json.load(open("selftest-app.json"))
+          print("Urdu Phonetic Transcription Tool for **Intel Macs** (macOS 12 or later).\n")
+          print("Download **UrduIPA-Intel.dmg**, open it, drag *Urdu IPA* to Applications, then read *Read Me First.txt*.\n")
+          print("### Build self-test (packaged app, build machine)")
+          print(f"- models: `{r.get('models')}`")
+          print(f"- model loading: {r.get('model_load_s')} s; one word, warm: {r.get('processing_ms_warm')} ms")
+          print(f"- timings (ms): `{r.get('timings_ms_warm')}`")
+          print(f"- lexicon entries: {r.get('lexicon_entries')}; failures: {r.get('failures')}")
+          print("\nThe self-test checks that everything loads and runs; it does not measure accuracy.")
+          PY
+          gh release create "$TAG" UrduIPA-Intel.dmg UrduIPA-Intel.dmg.sha256 selftest-app.json \
+            --title "Urdu IPA ${APP_VERSION} (Intel Mac) build ${GITHUB_RUN_NUMBER}" --notes-file notes.md

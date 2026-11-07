@@ -1,0 +1,17 @@
+{
+  "standard": {
+    "label": "Standard Pakistani Urdu (default)",
+    "description": "Educated urban Pakistani Urdu, careful citation pronunciation. Perso-Arabic /q x ɣ f z ʒ/ are expected; ع and ح are not realised as pharyngeals.",
+    "expected_variants": []
+  },
+  "punjabi": {
+    "label": "Punjabi-influenced Urdu",
+    "description": "Tendencies reported for Punjabi-L1 speakers. They are scored as legitimate variants, not errors. Validate against your own speaker data.",
+    "expected_variants": [["q", "k"], ["x", "kʰ"], ["ɣ", "ɡ"], ["z", "d͡ʒ"], ["f", "pʰ"], ["ʒ", "d͡ʒ"]]
+  },
+  "pashto": {
+    "label": "Pashto-influenced Urdu",
+    "description": "Tendencies reported for Pashto-L1 speakers (Pashto has no phonemic aspiration). Scored as legitimate variants. Validate against your own speaker data.",
+    "expected_variants": [["pʰ", "p"], ["t̪ʰ", "t̪"], ["ʈʰ", "ʈ"], ["kʰ", "k"], ["t͡ʃʰ", "t͡ʃ"], ["f", "p"], ["q", "k"]]
+  }
+}

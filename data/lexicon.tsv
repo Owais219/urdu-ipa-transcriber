@@ -1,0 +1,77 @@
+# Seed pronunciation lexicon - Standard Pakistani Urdu, careful citation forms.
+# Word-final ہ after a consonant is written as short ɑ (ا = ɑː). A final breathy [h] is not
+# written here: the tool measures it from each recording.
+# verified=no: entered by the tool author as a starting point. A phonologist must
+# check every row (and set verified=yes) before results are used as research data.
+word	phonemic	citation_phonetic	gloss	source	verified	notes
+پانی	pɑːniː		water	seed	no
+پل	pəl		moment	seed	no	homograph of پل 'bridge'
+پل	pʊl		bridge	seed	no	homograph of پل 'moment'
+پھل	pʰəl		fruit	seed	no	aspiration minimal pair with پل
+پھول	pʰuːl		flower	seed	no
+کال	kɑːl		famine	seed	no
+کھال	kʰɑːl		skin	seed	no	aspiration minimal pair with کال
+کھانا	kʰɑːnɑː		food	seed	no
+تال	t̪ɑːl		rhythm	seed	no	dental vs retroflex: ٹال
+تھال	t̪ʰɑːl		platter	seed	no
+ٹال	ʈɑːl		put off (imperative)	seed	no
+ٹھیک	ʈʰiːk		fine	seed	no
+ٹوپی	ʈoːpiː		cap	seed	no
+دال	d̪ɑːl		lentils	seed	no	dental vs retroflex: ڈال
+ڈال	ɖɑːl		put (imperative)	seed	no
+ڈاک	ɖɑːk		post	seed	no
+دھوپ	d̪ʱuːp		sunshine	seed	no
+ڈھول	ɖʱoːl		drum	seed	no
+بھائی	bʱɑːiː		brother	seed	no
+بھوک	bʱuːk		hunger	seed	no
+گھر	ɡʱər		house	seed	no
+گھوڑا	ɡʱoːɽɑː		horse	seed	no
+جھیل	d͡ʒʱiːl		lake	seed	no
+چھت	t͡ʃʰət̪		roof	seed	no
+ہاتھ	hɑːt̪ʰ	ɦɑːt̪ʰ	hand	seed	no	/h/ commonly voiced [ɦ]
+ساتھ	sɑːt̪ʰ		with	seed	no
+سات	sɑːt̪		seven	seed	no	aspiration minimal pair with ساتھ
+آٹھ	ɑːʈʰ		eight	seed	no
+بات	bɑːt̪		matter	seed	no
+لڑکا	ləɽkɑː		boy	seed	no
+پڑھ	pəɽʱ		read (imperative)	seed	no
+گاڑی	ɡɑːɽiː		vehicle	seed	no
+بیٹا	beːʈɑː		son	seed	no
+دو	d̪oː		two	seed	no
+دل	d̪ɪl		heart	seed	no
+دن	d̪ɪn		day	seed	no
+کون	kɔːn		who	seed	no
+اور	ɔːr		and	seed	no
+سیب	seːb		apple	seed	no
+شیر	ʃeːr		lion	seed	no
+تیر	t̪iːr		arrow	seed	no
+شام	ʃɑːm		evening	seed	no
+کتاب	kɪt̪ɑːb		book	seed	no
+ماں	mɑ̃ː		mother	seed	no	nasalised vowel
+ہاں	hɑ̃ː	ɦɑ̃ː	yes	seed	no
+میں	mɛ̃ː		I	seed	no
+نہیں	nəhĩː		no	seed	no	colloquial [nɛ̃ː] is common
+آنکھ	ɑ̃ːkʰ		eye	seed	no
+سانپ	sɑ̃ːp		snake	seed	no
+چاند	t͡ʃɑ̃ːd̪		moon	seed	no
+ٹھنڈا	ʈʰənɖɑː	ʈʰəɳɖɑː	cold	seed	no	nasal assimilates to following retroflex
+رنگ	rənɡ	rəŋɡ	colour	seed	no	nasal assimilates to following velar
+پتا	pət̪ɑː		address; known	seed	no	singleton vs geminate: پتّا
+پتّا	pət̪ːɑː		leaf	seed	no	geminate
+پکّا	pəkːɑː		ripe; firm	seed	no	geminate
+بچّہ	bət͡ʃːɑ		child	seed	no	geminate
+سچّا	sət͡ʃːɑː		truthful	seed	no	geminate
+اچھا	ət͡ʃːʰɑː		good	seed	no	aspirated geminate; spelling has no tashdid
+مٹّی	mɪʈːiː		soil	seed	no	geminate
+کتّا	kʊt̪ːɑː		dog	seed	no	geminate
+مکھی	məkːʰiː		fly	seed	no	aspirated geminate
+محبت	mʊhəbːət̪		love	seed	no	geminate
+قلم	qələm		pen	seed	no	Punjabi-influenced variant [kələm] is common
+خط	xət̪		letter	seed	no
+غلط	ɣələt̪		wrong	seed	no
+ذرا	zərɑː		a little	seed	no
+ژالہ	ʒɑːlɑ		hail	seed	no
+عید	iːd̪		Eid	seed	no	ع not realised in this profile; [ʔ] onset may occur
+حال	hɑːl		state	seed	no	ح realised as /h/
+فون	foːn		telephone	seed	no	English loan; [pʰoːn] occurs in some varieties
+جرگہ	d͡ʒɪrɡɑ		tribal council (jirga)	seed	no	Pashto-origin loan

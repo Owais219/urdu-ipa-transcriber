@@ -1,0 +1,20 @@
+# Packaged Intel-Mac app (Python 3.12). Every package below has a ready-made Intel-Mac wheel.
+torch==2.2.2               # last PyTorch release for Intel Macs
+numpy>=1.26,<2             # torch 2.2.2 is built against NumPy 1.x
+scipy>=1.11,<1.15
+soundfile>=0.12
+sounddevice>=0.4.6
+PySide6-Essentials==6.8.3  # Qt 6.8 LTS: runs on macOS 12 Monterey and later
+openpyxl>=3.1
+panphon==0.21.2            # used by Allosaurus at run time
+pandas>=2.2,<3             # panphon dependency; 2.x works with NumPy 1.26
+ctranslate2==4.6.0         # Whisper inference engine (macOS 10.13+ Intel wheel)
+av==13.1.0                 # imported by faster-whisper (macOS 10.13+ Intel wheel)
+tokenizers>=0.20,<0.23
+huggingface-hub>=0.24,<1.0
+tqdm
+pyinstaller==6.22.3
+pytest>=8
+# faster-whisper==1.2.1 and allosaurus==1.0.2 are installed with --no-deps:
+#  - faster-whisper would pull onnxruntime (macOS 13+ only); it is needed only for the VAD filter, which is not used
+#  - allosaurus (its resampy -> numba chain is replaced by urdu_ipa._resampy_compat)

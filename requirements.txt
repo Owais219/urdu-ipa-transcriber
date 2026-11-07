@@ -1,0 +1,12 @@
+# Core
+numpy>=1.24
+scipy>=1.10
+soundfile>=0.12
+sounddevice>=0.4.6     # microphone (PortAudio; bundled in Windows/macOS wheels, Linux: apt install libportaudio2)
+PySide6>=6.5           # UI with correct Urdu (Arabic-script) shaping
+openpyxl>=3.1          # Excel export
+# Acoustic phone model
+torch>=2.1
+allosaurus==1.0.2      # GPL-3.0; downloads model uni2005 from GitHub on first use
+# Word recognition (Whisper / MMS)
+transformers>=4.40
