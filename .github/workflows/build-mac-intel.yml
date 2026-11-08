@@ -92,6 +92,10 @@ jobs:
           else
             echo "no Hindi voice on this runner; the self-test will use a synthetic signal"
           fi
+      - name: Speed benchmark of Whisper settings (information only)
+        continue-on-error: true
+        run: |
+          if [ -n "$WAV" ]; then python packaging/bench_asr.py models/whisper-urdu-ct2 "$WAV"; else echo "no test recording"; fi
       - name: Self-test from source (real models)
         run: python -m urdu_ipa --selftest ${WAV:+--wav "$WAV"} --json selftest-source.json
       - name: Build app
@@ -100,6 +104,7 @@ jobs:
           python packaging/dedupe_openmp.py "dist/Urdu IPA.app"
           codesign --force --deep --sign - "dist/Urdu IPA.app"
           codesign --verify --deep --verbose=2 "dist/Urdu IPA.app"
+          python packaging/check_min_macos.py "dist/Urdu IPA.app" 12.0
           du -sh "dist/Urdu IPA.app"
           lipo -archs "dist/Urdu IPA.app/Contents/MacOS/UrduIPA"
           plutil -p "dist/Urdu IPA.app/Contents/Info.plist" | grep -E "Microphone|Minimum|ShortVersion"

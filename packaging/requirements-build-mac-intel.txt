@@ -1,7 +1,7 @@
 # Packaged Intel-Mac app (Python 3.12). Every package below has a ready-made Intel-Mac wheel.
 torch==2.2.2               # last PyTorch release for Intel Macs
 numpy>=1.26,<2             # torch 2.2.2 is built against NumPy 1.x
-scipy>=1.11,<1.15
+scipy==1.13.1              # 1.14 picks a macOS-14-only wheel on new build machines
 soundfile>=0.12
 sounddevice>=0.4.6
 PySide6-Essentials==6.8.3  # Qt 6.8 LTS: runs on macOS 12 Monterey and later
