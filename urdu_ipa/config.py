@@ -42,6 +42,7 @@ class Config:
     device: str = "cpu"
     highpass_hz: float = 60.0
     min_asr_confidence: float = 0.5
+    skip_asr_with_expected_word: bool = True   # fast mode: Whisper is not run when the expected word is typed
     processing_timeout: float = 300.0
     recording: RecordingConfig = field(default_factory=RecordingConfig)
     vad: VADConfig = field(default_factory=VADConfig)

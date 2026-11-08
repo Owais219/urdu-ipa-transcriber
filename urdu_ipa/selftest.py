@@ -60,10 +60,13 @@ def run(argv) -> int:
             x, sr = sf.read(a.wav, always_2d=False)
         else:
             x, sr = _synthetic_word()
-        runs = []
-        for i in range(3):
-            r = p.process(x, sr, expected_word=a.word)
-            runs.append(r)
+        full = p.process(x, sr, expected_word=a.word, skip_asr=False)       # with Whisper
+        report["full_mode_ms"] = full.processing_ms
+        report["full_mode_timings_ms"] = full.timings_ms
+        report["full_mode_asr_text"] = full.asr_text
+        if full.status == "error":
+            failures.append(f"full-mode pipeline error: {full.message} {full.warnings}")
+        runs = [p.process(x, sr, expected_word=a.word, skip_asr=True) for _ in range(3)]   # fast mode
         r = runs[-1]
         report["result"] = {k: getattr(r, k) for k in ("status", "problem", "message", "recognized_word", "asr_text",
                                                          "word_confidence", "phonetic", "phonemic",

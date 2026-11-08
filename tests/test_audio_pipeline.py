@@ -159,6 +159,7 @@ def _pipeline(tmp_path, asr_text, phones, lexicon_rows=None):
     for w, ph in (lexicon_rows or []):
         lex.add(Entry(w, ph))
     cfg = Config(data_dir=str(tmp_path), asr_backend="manual")
+    cfg.skip_asr_with_expected_word = False   # exercise recognition; fast mode has its own tests
     cfg.reconcile.min_confidence = 0.3     # fake model cannot test gemination; lenient for unit tests
     cfg.reconcile.max_unresolved_fraction = 0.5
     p = Pipeline(cfg, asr=FakeASR(asr_text), acoustic=FakeAcoustic(phones), lexicon=lex)
@@ -389,3 +390,30 @@ def test_auto_asr_resolution(tmp_path, monkeypatch):
     (tmp_path / "ct2").mkdir()
     monkeypatch.setattr(C, "BUNDLED_WHISPER", tmp_path / "ct2")
     assert cfg.resolved_asr() == ("faster-whisper", str(tmp_path / "ct2"))
+
+
+def test_fast_mode_skips_recognition(tmp_path):
+    class CountingASR(FakeASR):
+        calls = 0
+        def transcribe(self, audio16k):
+            CountingASR.calls += 1
+            return super().transcribe(audio16k)
+    lex = Lexicon(tmp_path / "lex.tsv"); lex.add(Entry("پھل", "pʰəl"))
+    cfg = Config(data_dir=str(tmp_path)); cfg.reconcile.min_confidence = 0.3
+    p = Pipeline(cfg, asr=CountingASR("پل"), acoustic=FakeAcoustic(["pʰ", "ə", "l"]), lexicon=lex); p.load()
+    r = p.process(word_like(), SR, expected_word="پھل")
+    assert CountingASR.calls == 0 and "asr_skipped" in r.warnings
+    assert r.status == "ok" and r.phonetic == "[pʰəl]" and r.recognized_word == "" and r.analysed_word == "پھل"
+    assert r.timings_ms["asr_ms"] < 5
+    r = p.process(word_like(), SR, expected_word="پھل", skip_asr=False)      # explicit full mode
+    assert CountingASR.calls == 1 and r.recognized_word == "پل"
+    p.process(word_like(), SR)                                               # no expected word: always recognises
+    assert CountingASR.calls == 2
+
+
+def test_fast_mode_still_refuses_wrong_word(tmp_path):
+    lex = Lexicon(tmp_path / "lex.tsv"); lex.add(Entry("پھل", "pʰəl"))
+    cfg = Config(data_dir=str(tmp_path))
+    p = Pipeline(cfg, asr=FakeASR(""), acoustic=FakeAcoustic(["ʃ", "iː", "ʒ", "uː"]), lexicon=lex); p.load()
+    r = p.process(word_like(), SR, expected_word="پھل")
+    assert r.status == "refused" and r.phonetic is None

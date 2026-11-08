@@ -92,10 +92,6 @@ jobs:
           else
             echo "no Hindi voice on this runner; the self-test will use a synthetic signal"
           fi
-      - name: Speed benchmark of Whisper settings (information only)
-        continue-on-error: true
-        run: |
-          if [ -n "$WAV" ]; then python packaging/bench_asr.py models/whisper-urdu-ct2 "$WAV"; else echo "no test recording"; fi
       - name: Self-test from source (real models)
         run: python -m urdu_ipa --selftest ${WAV:+--wav "$WAV"} --json selftest-source.json
       - name: Build app
@@ -154,7 +150,8 @@ jobs:
           print("Download **UrduIPA-Intel.dmg**, open it, drag *Urdu IPA* to Applications, then read *Read Me First.txt*.\n")
           print("### Build self-test (packaged app, build machine)")
           print(f"- models: `{r.get('models')}`")
-          print(f"- model loading: {r.get('model_load_s')} s; one word, warm: {r.get('processing_ms_warm')} ms")
+          print(f"- model loading: {r.get('model_load_s')} s")
+          print(f"- one word with Whisper recognition: {r.get('full_mode_ms')} ms; fast mode (expected word typed): {r.get('processing_ms_warm')} ms")
           print(f"- timings (ms): `{r.get('timings_ms_warm')}`")
           print(f"- lexicon entries: {r.get('lexicon_entries')}; failures: {r.get('failures')}")
           print("\nThe self-test checks that everything loads and runs; it does not measure accuracy.")

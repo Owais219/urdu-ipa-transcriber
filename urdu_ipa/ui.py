@@ -165,6 +165,12 @@ class MainWindow(QMainWindow):
         opts.addWidget(QLabel("Profile:"))
         opts.addWidget(self.profile, 2)
         opts.addWidget(self.speaker)
+        self.chk_fast = QCheckBox("Fast mode")
+        self.chk_fast.setChecked(self.cfg.skip_asr_with_expected_word)
+        self.chk_fast.setToolTip("When an expected word is typed, skip speech recognition (Whisper) and analyse the "
+                                 "typed word directly. Results arrive in under a second. The pronunciation is still "
+                                 "decided from the audio. With the box empty, recognition always runs.")
+        opts.addWidget(self.chk_fast)
         lay.addLayout(opts)
 
         rec = QGroupBox("Recording")
@@ -419,7 +425,7 @@ class MainWindow(QMainWindow):
         self._job_seq += 1
         self._pending_job = self._job_seq
         job = Job(self._job_seq, self.pipeline.process, self.samples, self.sr, self.expected.text(),
-                  self.profile.currentData() or "standard")
+                  self.profile.currentData() or "standard", self.chk_fast.isChecked())
         job.signals.done.connect(self._processed)
         job.signals.failed.connect(self._failed)
         # the timeout counts from when processing actually starts, not while it waits in the queue

@@ -43,6 +43,9 @@ WARNINGS = {
     "lexicon_unverified": "The dictionary entry used has not been verified by a phonologist.",
     "no_lexicon_entry": "Word not in the pronunciation lexicon: vowels and ambiguous letters were decided from the audio only. No phonemic form is shown.",
     "low_asr_confidence": "Word recognition confidence is low.",
+    "asr_skipped": "Fast mode: word recognition was skipped and the typed expected word was analysed. "
+                   "The pronunciation is still decided from the audio; if the speaker said a different word, "
+                   "the result is refused.",
 }
 
 
@@ -115,10 +118,6 @@ class Pipeline:
             t = time.perf_counter()
             try:
                 obj.load()
-                if name == "asr" and obj.name != "manual":
-                    if progress:
-                        progress("Warming up the speech recogniser…")
-                    obj.transcribe(np.zeros(16000, dtype=np.float32))   # first inference is the slowest
             except Exception as e:  # missing package, failed download, ...
                 self.load_errors[name] = f"{type(e).__name__}: {e}"
             self.load_times_s[name] = round(time.perf_counter() - t, 1)
@@ -129,12 +128,13 @@ class Pipeline:
         return {"asr": self.asr.version, "acoustic": self.acoustic.version, "app": __version__}
 
     # ------------------------------------------------------------------
-    def process(self, samples: np.ndarray, sr: int, expected_word: str = "", profile: str = "standard") -> Result:
+    def process(self, samples: np.ndarray, sr: int, expected_word: str = "", profile: str = "standard",
+                skip_asr: bool | None = None) -> Result:
         if not self._job_lock.acquire(blocking=False):
             r = Result(status="error", problem="busy", message="Another recording is still being processed.")
             return r
         try:
-            return self._process(samples, sr, expected_word, profile)
+            return self._process(samples, sr, expected_word, profile, skip_asr)
         except Exception:
             r = Result(status="error", problem="processing_failure", message=MESSAGES["processing_failure"])
             r.warnings.append(traceback.format_exc(limit=3))
@@ -142,7 +142,7 @@ class Pipeline:
         finally:
             self._job_lock.release()
 
-    def _process(self, samples, sr, expected_word, profile) -> Result:
+    def _process(self, samples, sr, expected_word, profile, skip_asr=None) -> Result:
         t_start = time.perf_counter()
         cfg = self.cfg
         res = Result(profile=profile, models=self.models(), expected_word=normalize(expected_word or ""))
@@ -178,7 +178,12 @@ class Pipeline:
         # ---- word recognition ----
         t = time.perf_counter()
         asr: ASRResult | None = None
-        if self.asr.name != "manual" and "asr" not in self.load_errors:
+        if skip_asr is None:
+            skip_asr = self.cfg.skip_asr_with_expected_word
+        fast = bool(skip_asr and res.expected_word)
+        if fast:
+            res.warnings.append("asr_skipped")
+        elif self.asr.name != "manual" and "asr" not in self.load_errors:
             asr = self.asr.transcribe(x)
             res.asr_text, res.asr_alternatives = asr.text, asr.alternatives
             res.word_confidence = None if asr.confidence is None else round(asr.confidence, 3)

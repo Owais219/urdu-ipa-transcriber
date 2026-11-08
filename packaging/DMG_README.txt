@@ -26,6 +26,13 @@ Type the expected word in Urdu script (optional), click Start Recording, say
 one word, and leave about half a second of silence before you click Stop.
 Everything works offline; no models are downloaded.
 
+SPEED
+"Fast mode" (on by default): when you type the expected word, the app skips
+speech recognition and analyses the pronunciation directly from the audio;
+the result appears in under a second.
+With the expected-word box empty, the app first recognises the word with
+Whisper, which takes roughly 5-15 seconds per word on an Intel Mac.
+
 YOUR FILES
 Recordings, the dataset, your own lexicon entries (my_lexicon.tsv) and a log
 file are in the "UrduIPA" folder in your home folder. If something goes wrong,
