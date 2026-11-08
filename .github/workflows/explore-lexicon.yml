@@ -1,0 +1,11 @@
+name: Explore Wiktionary Urdu lexicon
+on: workflow_dispatch
+jobs:
+  explore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          curl -fL --retry 5 -o urdu.jsonl https://kaikki.org/dictionary/Urdu/kaikki.org-dictionary-Urdu.jsonl
+          ls -la urdu.jsonl
+          python3 packaging/explore_wiktionary.py urdu.jsonl
