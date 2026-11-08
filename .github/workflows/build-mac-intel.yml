@@ -14,7 +14,7 @@ permissions:
   contents: write
 
 env:
-  APP_VERSION: "0.2.0"
+  APP_VERSION: "0.3.0"
   WHISPER_MODEL: ${{ github.event.inputs.whisper_model || 'kingabzpro/whisper-large-v3-turbo-urdu' }}
   CT2_VERSION: "4.6.0"
 
@@ -117,6 +117,21 @@ jobs:
           sleep 40
           if kill -0 $PID 2>/dev/null; then echo "app still running after 40 s"; kill $PID; else echo "APP EXITED EARLY"; cat ~/UrduIPA/logs/app.log; exit 1; fi
           echo "--- app.log ---"; cat ~/UrduIPA/logs/app.log || true
+      - name: Build the small update app (no Whisper model inside)
+        run: |
+          LITE=1 pyinstaller --noconfirm --clean --distpath dist-lite --workpath build-lite packaging/UrduIPA.spec
+          python packaging/dedupe_openmp.py "dist-lite/Urdu IPA.app"
+          codesign --force --deep --sign - "dist-lite/Urdu IPA.app"
+          codesign --verify --deep --verbose=2 "dist-lite/Urdu IPA.app"
+          python packaging/check_min_macos.py "dist-lite/Urdu IPA.app" 12.0
+          du -sh "dist-lite/Urdu IPA.app"
+          test -z "$(find 'dist-lite/Urdu IPA.app' -name model.bin -path '*whisper*')" || (echo "lite app must not contain Whisper"; exit 1)
+      - name: Self-test the update app using a model copied the way users will copy it
+        run: |
+          rm -rf ~/UrduIPA/models
+          bash packaging/keep_whisper_model.sh "dist/Urdu IPA.app"
+          "dist-lite/Urdu IPA.app/Contents/MacOS/UrduIPA" --selftest ${WAV:+--wav "$WAV"} --json selftest-lite.json
+          python -c "import json;r=json.load(open('selftest-lite.json'));assert 'UrduIPA/models' in r['whisper_model_dir'], r['whisper_model_dir'];assert r['ok']"
       - name: Make DMG
         run: |
           mkdir -p dmgroot
@@ -128,9 +143,21 @@ jobs:
             sleep 10
           done
           hdiutil verify UrduIPA-Intel.dmg
+          mkdir -p dmglite
+          cp -R "dist-lite/Urdu IPA.app" dmglite/
+          ln -s /Applications dmglite/Applications
+          cp packaging/DMG_README_UPDATE.txt "dmglite/Read Me First (update).txt"
+          cp packaging/keep_whisper_model.sh dmglite/keep_whisper_model.sh
+          for i in 1 2 3; do
+            hdiutil create -volname "Urdu IPA update" -srcfolder dmglite -fs HFS+ -format UDZO -imagekey zlib-level=6 -ov UrduIPA-Intel-update.dmg && break
+            sleep 10
+          done
+          hdiutil verify UrduIPA-Intel-update.dmg
+          ls -la UrduIPA-Intel-update.dmg
           ls -la UrduIPA-Intel.dmg
           SIZE=$(stat -f%z UrduIPA-Intel.dmg); test "$SIZE" -lt 2000000000 || (echo "DMG too large for a release asset"; exit 1)
           shasum -a 256 UrduIPA-Intel.dmg | tee UrduIPA-Intel.dmg.sha256
+          shasum -a 256 UrduIPA-Intel-update.dmg | tee UrduIPA-Intel-update.dmg.sha256
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -147,7 +174,8 @@ jobs:
           import json
           r = json.load(open("selftest-app.json"))
           print("Urdu Phonetic Transcription Tool for **Intel Macs** (macOS 12 or later).\n")
-          print("Download **UrduIPA-Intel.dmg**, open it, drag *Urdu IPA* to Applications, then read *Read Me First.txt*.\n")
+          print("- **New install:** download **UrduIPA-Intel.dmg** (about 1 GB, includes both speech models).")
+          print("- **Updating an installed copy:** download the much smaller **UrduIPA-Intel-update.dmg** and follow its *Read Me First (update).txt*; it reuses the Whisper model you already have.\n")
           print("### Build self-test (packaged app, build machine)")
           print(f"- models: `{r.get('models')}`")
           print(f"- model loading: {r.get('model_load_s')} s")
@@ -156,5 +184,5 @@ jobs:
           print(f"- lexicon entries: {r.get('lexicon_entries')}; failures: {r.get('failures')}")
           print("\nThe self-test checks that everything loads and runs; it does not measure accuracy.")
           PY
-          gh release create "$TAG" UrduIPA-Intel.dmg UrduIPA-Intel.dmg.sha256 selftest-app.json \
+          gh release create "$TAG" UrduIPA-Intel.dmg UrduIPA-Intel.dmg.sha256 UrduIPA-Intel-update.dmg UrduIPA-Intel-update.dmg.sha256 selftest-app.json \
             --title "Urdu IPA ${APP_VERSION} (Intel Mac) build ${GITHUB_RUN_NUMBER}" --notes-file notes.md

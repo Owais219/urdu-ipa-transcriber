@@ -17,6 +17,13 @@ FROZEN = bool(getattr(sys, "frozen", False))
 RESOURCE_DIR = Path(getattr(sys, "_MEIPASS", PACKAGE_DIR.parent))
 PROJECT_DATA = RESOURCE_DIR / "data"
 BUNDLED_WHISPER = RESOURCE_DIR / "models" / "whisper-urdu-ct2"
+# the "lite" update app ships without Whisper and uses a copy kept in the user's data folder
+USER_WHISPER = Path.home() / "UrduIPA" / "models" / "whisper-urdu-ct2"
+
+
+def find_whisper() -> Path | None:
+    """The converted Whisper model: inside the app, else the user's copy (lite update app)."""
+    return _find_whisper()
 
 
 @dataclass
@@ -64,15 +71,17 @@ class Config:
         return p
 
     @property
-    def builtin_lexicon(self) -> Path:
-        return PROJECT_DATA / "lexicon.tsv"
+    def builtin_lexicon(self) -> list[Path]:
+        """Built-in lexicons, lowest priority first: Wiktionary (broad coverage), then the hand-checked list."""
+        return [PROJECT_DATA / "lexicon_wiktionary.tsv", PROJECT_DATA / "lexicon.tsv"]
 
     def resolved_asr(self) -> tuple[str, str]:
         """auto: the bundled fast Whisper model when present, else Whisper via transformers."""
         if self.asr_backend != "auto":
             return self.asr_backend, self.asr_model
-        if BUNDLED_WHISPER.exists():
-            return "faster-whisper", self.asr_model or str(BUNDLED_WHISPER)
+        found = _find_whisper()
+        if found is not None:
+            return "faster-whisper", self.asr_model or str(found)
         return "whisper", self.asr_model
 
 
@@ -106,3 +115,12 @@ def save_config(cfg: Config, path: str | Path | None = None) -> Path:
     with p.open("w", encoding="utf-8") as f:
         json.dump(asdict(cfg), f, ensure_ascii=False, indent=2)
     return p
+
+
+def _find_whisper():
+    # looked up at call time so tests can monkeypatch BUNDLED_WHISPER / USER_WHISPER
+    import urdu_ipa.config as c
+    for p in (c.BUNDLED_WHISPER, c.USER_WHISPER):
+        if (p / "model.bin").exists():
+            return p
+    return None

@@ -43,6 +43,8 @@ WARNINGS = {
     "lexicon_unverified": "The dictionary entry used has not been verified by a phonologist.",
     "no_lexicon_entry": "Word not in the pronunciation lexicon: vowels and ambiguous letters were decided from the audio only. No phonemic form is shown.",
     "low_asr_confidence": "Word recognition confidence is low.",
+    "partly_confirmed": "Some segments are only consistent with the recording, not confirmed by it "
+                        "(the audio favours the dictionary value but not clearly). See the segment evidence.",
     "asr_skipped": "Fast mode: word recognition was skipped and the typed expected word was analysed. "
                    "The pronunciation is still decided from the audio; if the speaker said a different word, "
                    "the result is refused.",
@@ -72,6 +74,8 @@ class Result:
     free_decode: str = ""
     fit_gap: float | None = None
     other_candidates: list[dict] = field(default_factory=list)
+    dictionary: list[dict] = field(default_factory=list)   # lexicon pronunciations, best audio fit first
+    evidence_standard: str = "standard"
     warnings: list[str] = field(default_factory=list)
     audio_report: dict = field(default_factory=dict)
     timings_ms: dict = field(default_factory=dict)
@@ -145,7 +149,8 @@ class Pipeline:
     def _process(self, samples, sr, expected_word, profile, skip_asr=None) -> Result:
         t_start = time.perf_counter()
         cfg = self.cfg
-        res = Result(profile=profile, models=self.models(), expected_word=normalize(expected_word or ""))
+        res = Result(profile=profile, models=self.models(), expected_word=normalize(expected_word or ""),
+                     evidence_standard=cfg.reconcile.evidence_standard)
         timings = res.timings_ms
 
         def done(status, problem=""):
@@ -267,6 +272,9 @@ class Pipeline:
         res.other_candidates = [{"word": w2, "candidate": r2.candidate_label, "score": r2.score,
                                  "score_gap": round(best.score - r2.score, 3), "phonetic": r2.phonetic}
                                 for r2, w2, _ in outcomes[1:]]
+        res.dictionary = [{"word": w2, "phonemic": f"/{e2.phonemic}/", "gloss": e2.gloss, "source": e2.source,
+                           "verified": e2.is_verified, "audio_fit_rank": i + 1}
+                          for i, (_r2, w2, e2) in enumerate(outcomes) if e2 is not None]
         if entry is not None:
             res.lexicon_verified = entry.is_verified
             if not entry.is_verified:
@@ -283,6 +291,8 @@ class Pipeline:
         if not best.reliable:
             res.warnings += [f"reason: {r}" for r in best.reasons]
             return done("refused", "unreliable")
+        if any(s.status == "consistent" for s in best.segments):
+            res.warnings.append("partly_confirmed")
         res.phonetic = f"[{best.phonetic}]"
         res.narrow = f"[{best.narrow}]" if best.narrow and best.narrow != best.phonetic else None
         if entry is not None:

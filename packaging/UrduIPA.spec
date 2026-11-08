@@ -6,16 +6,18 @@ from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 ROOT = Path(SPECPATH).parent
 VERSION = os.environ.get("APP_VERSION", "0.2.0")
+LITE = os.environ.get("LITE") == "1"        # update build without the Whisper model (uses ~/UrduIPA/models)
 WHISPER = ROOT / "models" / "whisper-urdu-ct2"
-if not (WHISPER / "model.bin").exists():
+if not LITE and not (WHISPER / "model.bin").exists():
     raise SystemExit(f"converted Whisper model missing: {WHISPER}")
 
 datas = [
     (str(ROOT / "data"), "data"),
-    (str(WHISPER), "models/whisper-urdu-ct2"),
     (str(ROOT / "docs"), "docs"),
     (str(ROOT / "README.md"), "."),
 ]
+if not LITE:
+    datas.append((str(WHISPER), "models/whisper-urdu-ct2"))
 datas += collect_data_files("allosaurus")          # includes pretrained/uni2005 (phone model)
 datas += collect_data_files("panphon")
 datas += collect_data_files("faster_whisper")

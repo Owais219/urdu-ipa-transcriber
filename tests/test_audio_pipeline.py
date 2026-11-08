@@ -386,9 +386,13 @@ def test_auto_asr_resolution(tmp_path, monkeypatch):
     import urdu_ipa.config as C
     cfg = Config(data_dir=str(tmp_path))
     monkeypatch.setattr(C, "BUNDLED_WHISPER", tmp_path / "nope")
+    monkeypatch.setattr(C, "USER_WHISPER", tmp_path / "nope2")
     assert cfg.resolved_asr()[0] == "whisper"
-    (tmp_path / "ct2").mkdir()
-    monkeypatch.setattr(C, "BUNDLED_WHISPER", tmp_path / "ct2")
+    (tmp_path / "user").mkdir(); (tmp_path / "user" / "model.bin").write_bytes(b"x")
+    monkeypatch.setattr(C, "USER_WHISPER", tmp_path / "user")                 # lite app: copy in ~/UrduIPA
+    assert cfg.resolved_asr() == ("faster-whisper", str(tmp_path / "user"))
+    (tmp_path / "ct2").mkdir(); (tmp_path / "ct2" / "model.bin").write_bytes(b"x")
+    monkeypatch.setattr(C, "BUNDLED_WHISPER", tmp_path / "ct2")               # bundled copy wins
     assert cfg.resolved_asr() == ("faster-whisper", str(tmp_path / "ct2"))
 
 
@@ -417,3 +421,54 @@ def test_fast_mode_still_refuses_wrong_word(tmp_path):
     p = Pipeline(cfg, asr=FakeASR(""), acoustic=FakeAcoustic(["ʃ", "iː", "ʒ", "uː"]), lexicon=lex); p.load()
     r = p.process(word_like(), SR, expected_word="پھل")
     assert r.status == "refused" and r.phonetic is None
+
+
+def test_refusal_still_reports_dictionary_pronunciations(tmp_path):
+    lex = Lexicon(tmp_path / "lex.tsv"); lex.add(Entry("پتا", "pət̪ɑː", gloss="knowledge"))
+    lex.add(Entry("پتا", "pət̪ːɑː", gloss="leaf"))
+    cfg = Config(data_dir=str(tmp_path))
+    p = Pipeline(cfg, asr=FakeASR(""), acoustic=FakeAcoustic(["ʃ", "iː", "ʒ", "uː"]), lexicon=lex); p.load()
+    r = p.process(word_like(), SR, expected_word="پتا")
+    assert r.status == "refused" and r.phonetic is None
+    assert {d["phonemic"] for d in r.dictionary} == {"/pət̪ɑː/", "/pət̪ːɑː/"}
+    st = Store(tmp_path / "d"); st.save(word_like(), SR, r)
+    assert "/pət̪ɑː/" in st.rows()[0]["dictionary_ipa"]
+
+
+def test_wiktionary_lexicon_layer(tmp_path):
+    cfg = Config(data_dir=str(tmp_path))
+    lex = Lexicon(cfg.resolved_lexicon(), base=cfg.builtin_lexicon)
+    assert len(lex) > 7000 and lex.problems == []
+    assert [e.phonemic for e in lex.lookup("سلام")] == ["səlɑːm"]
+    assert [e.phonemic for e in lex.lookup("بچّہ")] == ["bət͡ʃːɑ"]               # hand-checked entry wins
+    assert lex.lookup("کمرہ")[0].phonemic == "kəmrɑ"                          # final ہ -> short ɑ
+
+
+def test_old_database_is_migrated(tmp_path):
+    import sqlite3
+    d = tmp_path / "old"; (d / "audio").mkdir(parents=True)
+    c = sqlite3.connect(d / "recordings.sqlite")
+    c.execute("CREATE TABLE recordings (id INTEGER PRIMARY KEY AUTOINCREMENT, created_at TEXT NOT NULL, excluded INTEGER NOT NULL DEFAULT 0)")
+    c.commit(); c.close()
+    st = Store(d)
+    cols = {r[1] for r in sqlite3.connect(d / "recordings.sqlite").execute("PRAGMA table_info(recordings)")}
+    assert "dictionary_ipa" in cols
+
+
+def test_standard_vs_strict_evidence(tmp_path):
+    """A dictionary value the audio favours only slightly is 'consistent' (standard) or 'unresolved' (strict)."""
+    from urdu_ipa.reconcile import DimEvidence
+    for standard, ok_expected in (("standard", True), ("strict", False)):
+        cfg = ReconcileConfig(evidence_standard=standard, margin=50.0)   # margin no fake score can reach
+        r = _reconcile(["pʰ", "ə", "l"], ["pʰ", "ə", "l"], cfg=cfg)
+        sts = {s.status for s in r.segments}
+        if ok_expected:
+            assert r.reliable and "consistent" in sts and "unresolved" not in sts
+        else:
+            assert not r.reliable and "unresolved" in sts
+
+
+def test_contradicting_audio_is_not_consistent():
+    cfg = ReconcileConfig(evidence_standard="standard")
+    r = _reconcile(["ʃ", "uː", "ʒ", "iː", "f"], ["pʰ", "ə", "l"], cfg=cfg)
+    assert not r.reliable and r.phonetic is None

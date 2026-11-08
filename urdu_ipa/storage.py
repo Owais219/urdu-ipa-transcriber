@@ -51,11 +51,13 @@ CREATE TABLE IF NOT EXISTS recordings (
     manual_by TEXT,
     manual_at TEXT,
     excluded INTEGER NOT NULL DEFAULT 0,
+    dictionary_ipa TEXT,
+    evidence_standard TEXT,
     notes TEXT
 );
 """
 EXPORT_COLUMNS = ["id", "created_at", "audio_path", "speaker", "profile", "expected_word", "recognized_word",
-                  "analysed_word", "status", "problem", "phonetic_ipa", "phonemic_ipa", "narrow_ipa",
+                  "analysed_word", "status", "problem", "phonetic_ipa", "phonemic_ipa", "narrow_ipa", "dictionary_ipa", "evidence_standard",
                   "word_confidence", "word_confidence_level", "phonetic_confidence", "phonetic_confidence_level",
                   "lexicon_verified", "manual_word", "manual_ipa", "manual_by", "manual_at", "excluded",
                   "asr_model", "acoustic_model", "app_version", "processing_ms", "warnings", "notes"]
@@ -73,6 +75,10 @@ class Store:
         self._lock = threading.Lock()
         with self._conn() as c:
             c.executescript(SCHEMA)
+            cols = {r[1] for r in c.execute("PRAGMA table_info(recordings)")}
+            for col in ("dictionary_ipa", "evidence_standard"):     # databases from version 0.1
+                if col not in cols:
+                    c.execute(f"ALTER TABLE recordings ADD COLUMN {col} TEXT")
 
     def _conn(self):
         c = sqlite3.connect(self.db_path)
@@ -90,6 +96,8 @@ class Store:
                    expected_word=result.expected_word, recognized_word=result.recognized_word,
                    analysed_word=result.analysed_word, status=result.status, problem=result.problem,
                    phonetic_ipa=result.phonetic, phonemic_ipa=result.phonemic, narrow_ipa=result.narrow,
+                   dictionary_ipa=" | ".join(d["phonemic"] for d in result.dictionary) or None,
+                   evidence_standard=result.evidence_standard,
                    word_confidence=result.word_confidence, word_confidence_level=result.word_confidence_level,
                    phonetic_confidence=result.phonetic_confidence,
                    phonetic_confidence_level=result.phonetic_confidence_level, candidate=result.candidate,

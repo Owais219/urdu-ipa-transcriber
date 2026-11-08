@@ -31,10 +31,10 @@ from .storage import Store
 
 URDU_FONTS = ["Noto Nastaliq Urdu", "Jameel Noori Nastaleeq", "Noto Naskh Arabic", "Segoe UI", "Arial"]
 IPA_FONTS = ["Charis SIL", "Doulos SIL", "Gentium Plus", "Noto Sans", "Segoe UI", "DejaVu Sans", "Arial Unicode MS"]
-STATUS_TEXT = {"confirmed": "confirmed", "acoustic_variant": "realised differently from dictionary",
+STATUS_TEXT = {"confirmed": "confirmed by recording", "consistent": "consistent with recording (not confirmed)", "acoustic_variant": "realised differently from dictionary",
                "model_blind": "partly unverifiable by model", "unresolved": "unresolved",
                "not_realised": "not realised"}
-STATUS_COLOR = {"confirmed": "#1b7f3b", "acoustic_variant": "#1d4ed8", "model_blind": "#8a6d00",
+STATUS_COLOR = {"confirmed": "#1b7f3b", "consistent": "#4d7c0f", "acoustic_variant": "#1d4ed8", "model_blind": "#8a6d00",
                 "unresolved": "#b45309", "not_realised": "#6b7280"}
 
 
@@ -205,6 +205,7 @@ class MainWindow(QMainWindow):
         g.addWidget(self.message, 0, 0, 1, 2)
         names = [("word", "Recognized Urdu Word"), ("analysed", "Analysed as"), ("phonetic", "IPA Phonetic Transcription"),
                  ("phonemic", "IPA Phonemic Transcription"), ("narrow", "Narrow Phonetic Transcription"),
+                 ("dictionary", "Dictionary Pronunciation\n(not confirmed by this recording)"),
                  ("wconf", "Word Recognition Confidence"), ("pconf", "Phonetic Transcription Confidence"),
                  ("time", "Processing Time")]
         self.val: dict[str, QLabel] = {}
@@ -217,6 +218,10 @@ class MainWindow(QMainWindow):
             v.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
             if k == "word" or k == "analysed":
                 v.setFont(font(URDU_FONTS, 20))
+            elif k == "dictionary":
+                v.setFont(font(IPA_FONTS, 16))
+                v.setWordWrap(True)
+                v.setStyleSheet("color:#6b7280")
             elif k in ("phonetic", "phonemic", "narrow"):
                 v.setFont(font(IPA_FONTS, 20 if k == "phonetic" else 16))
             g.addWidget(kl, r, 0)
@@ -297,6 +302,13 @@ class MainWindow(QMainWindow):
         a = QAction("Evaluate Test Set…", self)
         a.triggered.connect(self.evaluate)
         tm.addAction(a)
+        self.act_strict = QAction("Strict Evidence Standard", self, checkable=True)
+        self.act_strict.setChecked(self.cfg.reconcile.evidence_standard == "strict")
+        self.act_strict.setToolTip("Strict: give a transcription only when every tested contrast is confirmed by "
+                                   "the recording. Standard: also accept dictionary values the recording favours "
+                                   "without clearly confirming them (marked 'consistent').")
+        self.act_strict.toggled.connect(self._toggle_strict)
+        tm.addAction(self.act_strict)
         a = QAction("Add Word to Lexicon…", self)
         a.triggered.connect(self.add_lexicon_entry)
         tm.addAction(a)
@@ -470,13 +482,22 @@ class MainWindow(QMainWindow):
         self.key["analysed"].setVisible(show_analysed)
         self.val["analysed"].setVisible(show_analysed)
         self.val["phonetic"].setText(r.phonetic or "—")
-        for k, value in (("phonemic", r.phonemic), ("narrow", r.narrow)):
+        dict_text = ""
+        if r.status != "ok" and r.dictionary:
+            parts = []
+            for d in r.dictionary[:5]:
+                gloss = f" ‘{d['gloss'][:40]}’" if d.get("gloss") else ""
+                parts.append(f"{d['phonemic']}{gloss}")
+            dict_text = "   ·   ".join(parts)
+            if len(r.dictionary) > 1:
+                dict_text += "\n(ordered by how well each matches the recording)"
+        for k, value in (("phonemic", r.phonemic), ("narrow", r.narrow), ("dictionary", dict_text)):
             self.val[k].setText(value or "")
             self.key[k].setVisible(bool(value))
             self.val[k].setVisible(bool(value))
         wc = "not available" if r.word_confidence is None else f"{r.word_confidence_level} ({r.word_confidence:.2f}, uncalibrated)"
         pc = "—" if r.phonetic_confidence is None else (
-            f"{r.phonetic_confidence_level} ({r.phonetic_confidence:.0%} of tested contrasts supported)")
+            f"{r.phonetic_confidence_level} ({r.phonetic_confidence:.0%} of tested contrasts confirmed by the recording)")
         self.val["wconf"].setText(wc)
         self.val["pconf"].setText(pc)
         t = f"{r.processing_ms:.0f} ms"
@@ -516,7 +537,7 @@ class MainWindow(QMainWindow):
         self.message.setText("")
         for v in self.val.values():
             v.setText("—")
-        for k in ("analysed", "phonemic", "narrow"):
+        for k in ("analysed", "phonemic", "narrow", "dictionary"):
             self.key[k].setVisible(False)
             self.val[k].setVisible(False)
         self.warn.setText("")
@@ -650,6 +671,10 @@ class MainWindow(QMainWindow):
             self._show_error(str(e))
             return
         self.statusBar().showMessage(f"Added {word} /{ph.strip()}/ to {self.pipeline.lexicon.path}", 5000)
+
+    def _toggle_strict(self, on):
+        self.cfg.reconcile.evidence_standard = "strict" if on else "standard"
+        self.statusBar().showMessage("Evidence standard: " + self.cfg.reconcile.evidence_standard, 4000)
 
     def about(self):
         QMessageBox.information(self, "About", (

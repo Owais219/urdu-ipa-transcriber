@@ -46,6 +46,11 @@ class ReconcileConfig:
     max_unresolved_fraction: float = 0.25
     min_confidence: float = 0.5
     narrow_margin: float = 1.0
+    # "standard": a dictionary value the audio favours (margin >= 0) but not by `margin` counts as
+    #             CONSISTENT; a transcription is given when no segment is contradicted.
+    # "strict":   every tested contrast must be confirmed by `margin` (and min_confidence applies).
+    evidence_standard: str = "standard"
+    no_information: float = 0.05        # |margin| below this = the model gives no information (blind)
     vot: VOTThresholds = field(default_factory=VOTThresholds)
     gemination: GeminationThresholds = field(default_factory=GeminationThresholds)
     final_breath: FinalBreathThresholds = field(default_factory=FinalBreathThresholds)
@@ -239,10 +244,19 @@ class Reconciler:
                     trial = choice[:i] + [k] + choice[i + 1:]
                     m = sc_chosen - score(trial)
                     need = self.cfg.margin + (self._penalty(s, o) if o != expected else 0.0)
-                    ev = DimEvidence(dim, o, round(m, 3), "supported" if m >= need else "weak")
+                    if m >= need:
+                        status = "supported"
+                    elif abs(m) < self.cfg.no_information:
+                        status = "blind"
+                    elif (self.cfg.evidence_standard == "standard" and expected is not None
+                          and chosen == expected and m > 0):
+                        status = "consistent"          # audio favours the dictionary value, below the margin
+                    else:
+                        status = "weak"
+                    ev = DimEvidence(dim, o, round(m, 3), status)
                 cur = dims.get(dim)
                 # keep the weakest evidence per dimension
-                rank = {"weak": 0, "blind": 1, "supported": 2}
+                rank = {"weak": 0, "blind": 1, "consistent": 2, "supported": 3}
                 if cur is None or rank[ev.status] < rank[cur.status] or (
                         ev.status == cur.status and ev.margin is not None and cur.margin is not None and ev.margin < cur.margin):
                     dims[dim] = ev
@@ -266,12 +280,12 @@ class Reconciler:
                 seg.status = "unresolved"
             elif seg.expected is not None and seg.chosen != seg.expected:
                 seg.status = "acoustic_variant"
+            elif "consistent" in sts:
+                seg.status = "consistent"
             elif "blind" in sts:
                 seg.status = "model_blind"
             else:
                 seg.status = "confirmed"
-            if seg.expected is None and seg.status in ("confirmed", "model_blind") and seg.source != "lexical":
-                pass
 
         # empty slots that are optional (unwritten short vowels judged absent) are not "segments"
         scored = [e for e in evidence if not (e.chosen == "" and e.source in ("optional_vowel", FINAL_H))]
@@ -294,7 +308,7 @@ class Reconciler:
             reasons.append("acoustic_mismatch")
         if scored and unresolved / len(scored) > self.cfg.max_unresolved_fraction:
             reasons.append("too_many_unresolved")
-        if confidence < self.cfg.min_confidence:
+        if self.cfg.evidence_standard == "strict" and confidence < self.cfg.min_confidence:
             reasons.append("low_phonetic_confidence")
         reliable = not reasons
 

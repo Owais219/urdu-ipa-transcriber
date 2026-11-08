@@ -39,10 +39,10 @@ def run(argv) -> int:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     tmp = tempfile.mkdtemp(prefix="urduipa-selftest-")
     try:
-        from .config import BUNDLED_WHISPER, FROZEN, Config
+        from .config import FROZEN, Config, find_whisper
         from .pipeline import Pipeline
         report["frozen"] = FROZEN
-        report["bundled_whisper"] = BUNDLED_WHISPER.exists()
+        report["whisper_model_dir"] = str(find_whisper())
         cfg = Config(data_dir=tmp)
         report["asr_backend"] = list(cfg.resolved_asr())
         t = time.perf_counter()

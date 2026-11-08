@@ -47,9 +47,10 @@ class Lexicon:
     with the application; for any spelling present in the user lexicon, the user's rows
     replace the built-in rows."""
 
-    def __init__(self, path: str | Path, base: str | Path | None = None):
+    def __init__(self, path: str | Path, base: str | Path | list | None = None):
         self.path = Path(path)
-        self.base = Path(base) if base else None
+        # base: one built-in lexicon or a list, lowest priority first (later files override earlier ones per word)
+        self.bases = [Path(b) for b in (base if isinstance(base, (list, tuple)) else [base] if base else [])]
         self._lock = threading.Lock()
         self._by_key: dict[str, list[Entry]] = {}
         self.problems: list[str] = []
@@ -58,8 +59,9 @@ class Lexicon:
     def load(self) -> None:
         self._by_key.clear()
         self.problems.clear()
-        if self.base and self.base.exists() and self.base.resolve() != self.path.resolve():
-            self._by_key.update(self._read(self.base, "built-in"))
+        for b in self.bases:
+            if b.exists() and b.resolve() != self.path.resolve():
+                self._by_key.update(self._read(b, b.name))
         if self.path.exists():
             self._by_key.update(self._read(self.path, self.path.name))
 

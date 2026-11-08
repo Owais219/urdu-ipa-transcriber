@@ -31,6 +31,29 @@ The final-ہ breath thresholds (50 ms present / 20 ms absent) are also uncalibra
 recording stopped too soon after the word can make the end unmeasurable; the tool then says so.
 The phone model cannot separate short [ɑ] from long [ɑː], so that length contrast is reported as model-blind.
 
+## 3b. Evidence standard (Tools → Strict Evidence Standard)
+
+* **Standard (default).** For a word in the lexicon, a dictionary value that the recording favours, but not
+  by the full margin, is accepted and marked **consistent with recording (not confirmed)**. A transcription is
+  given when no segment is contradicted by the audio. "Phonetic confidence" counts only segments the
+  recording *confirms*.
+* **Strict.** Every tested contrast must be confirmed by the full margin, and the phonetic confidence must
+  reach 50 %. With the current universal phone model this refuses most words.
+* Each saved record stores the evidence standard used (`evidence_standard` column).
+* Development check on espeak-ng synthetic speech (not evidence of accuracy): standard transcribed 4 of 10
+  test words, strict 1 of 10.
+
+## 3c. Lexicon sources
+
+* `data/lexicon.tsv`: 71 hand-entered entries (unverified seed), highest built-in priority.
+* `data/lexicon_wiktionary.tsv`: 7,200 pronunciations for 6,528 words from English Wiktionary
+  (CC BY-SA 4.0, via kaikki.org/Wiktextract), converted to this project's conventions by
+  `packaging/build_wiktionary_lexicon.py`. Not individually verified; Wiktionary's "Standard Urdu"
+  transcriptions follow its Hindustani pronunciation module.
+* `~/UrduIPA/my_lexicon.tsv`: your own entries; they replace built-in entries for the same spelling.
+* When a word is refused, its dictionary pronunciation(s) are still shown, labelled "not confirmed by this
+  recording", ordered by how well each matches the recording.
+
 ## 4. Confidence values are not probabilities
 
 * *Word recognition confidence* is the recogniser's mean token probability (Whisper) or mean frame posterior (MMS).

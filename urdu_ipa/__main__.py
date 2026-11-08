@@ -5,8 +5,8 @@ import sys
 
 
 def _prepare_environment() -> None:
-    from .config import FROZEN, BUNDLED_WHISPER
-    if FROZEN or BUNDLED_WHISPER.exists():
+    from .config import FROZEN, find_whisper
+    if FROZEN or find_whisper() is not None:
         # every model ships with the app: never try the network
         os.environ.setdefault("HF_HUB_OFFLINE", "1")
         os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
