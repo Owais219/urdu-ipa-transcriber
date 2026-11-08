@@ -1,5 +1,7 @@
 name: Build Wiktionary Urdu lexicon
 on: workflow_dispatch
+permissions:
+  contents: write
 jobs:
   lexicon:
     runs-on: ubuntu-latest
@@ -11,9 +13,10 @@ jobs:
       - run: |
           pip install numpy scipy
           curl -fL --retry 5 -o urdu.jsonl https://kaikki.org/dictionary/Urdu/kaikki.org-dictionary-Urdu.jsonl
-          python packaging/build_wiktionary_lexicon.py urdu.jsonl lexicon_wiktionary.tsv
-          wc -l lexicon_wiktionary.tsv
-      - uses: actions/upload-artifact@v4
-        with:
-          name: lexicon-wiktionary
-          path: lexicon_wiktionary.tsv
+          python packaging/build_wiktionary_lexicon.py urdu.jsonl data/lexicon_wiktionary.tsv
+          wc -l data/lexicon_wiktionary.tsv
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/lexicon_wiktionary.tsv
+          git commit -m "Update Wiktionary Urdu lexicon [skip ci]" || echo "no change"
+          git push
