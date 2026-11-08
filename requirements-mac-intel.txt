@@ -14,3 +14,5 @@ transformers>=4.49,<4.58
 # (newer ones try to compile LLVM from source and fail)
 numba==0.62.1
 llvmlite==0.45.1
+# panphon (Allosaurus dependency) imports pkg_resources, removed in setuptools 81
+setuptools>=70,<81

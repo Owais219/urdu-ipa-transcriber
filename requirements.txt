@@ -10,3 +10,4 @@ torch>=2.1
 allosaurus==1.0.2      # GPL-3.0; downloads model uni2005 from GitHub on first use
 # Word recognition (Whisper / MMS)
 transformers>=4.40
+setuptools>=70,<81      # panphon needs pkg_resources
