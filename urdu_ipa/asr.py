@@ -177,6 +177,7 @@ class FasterWhisperASR(ASRBackend):
             segments, _info = self._model.transcribe(
                 np.asarray(audio16k, dtype=np.float32), language="ur", task="transcribe",
                 beam_size=self.beam_size, temperature=0.0, condition_on_previous_text=False,
+                max_new_tokens=24,                     # one word: never let Whisper run on
                 without_timestamps=True, vad_filter=False, word_timestamps=False)
             segs = list(segments)
         text = normalize(" ".join(s.text for s in segs))

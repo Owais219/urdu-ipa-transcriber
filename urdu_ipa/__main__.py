@@ -11,7 +11,7 @@ def _prepare_environment() -> None:
         os.environ.setdefault("HF_HUB_OFFLINE", "1")
         os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
     os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
-    os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")   # torch + ctranslate2 both ship OpenMP on macOS
+    # torch and ctranslate2 share ONE OpenMP runtime in the packaged app (packaging/dedupe_openmp.py)
 
 
 def _setup_logging() -> str:
