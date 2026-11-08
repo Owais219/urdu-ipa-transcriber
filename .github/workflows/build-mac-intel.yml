@@ -68,20 +68,10 @@ jobs:
           pip install --only-binary=:all: --no-binary=unicodecsv -r packaging/requirements-build-mac-intel.txt
           pip install --no-deps faster-whisper==1.2.1 allosaurus==1.0.2
           python -c "import torch, numpy, ctranslate2, PySide6, scipy, panphon; print('torch', torch.__version__, 'numpy', numpy.__version__, 'ct2', ctranslate2.__version__, 'qt', PySide6.__version__)"
-      - name: Cache phone model (Allosaurus uni2005)
-        id: allo-cache
-        uses: actions/cache@v4
-        with:
-          path: allosaurus-model/uni2005
-          key: allosaurus-uni2005-v1
-      - name: Download phone model (Allosaurus uni2005, with retries)
-        if: steps.allo-cache.outputs.cache-hit != 'true'
+      - name: Unpack vendored phone model (Allosaurus uni2005)
         run: |
-          mkdir -p allosaurus-model
-          curl -fL --retry 10 --retry-all-errors --retry-delay 15 --connect-timeout 30 \
-            -o allosaurus-model/uni2005.tar.gz https://github.com/xinjli/allosaurus/releases/download/v1.0/uni2005.tar.gz
-          tar -xzf allosaurus-model/uni2005.tar.gz -C allosaurus-model
-          rm allosaurus-model/uni2005.tar.gz
+          shasum -a 256 -c vendor/allosaurus-uni2005.tar.gz.sha256
+          mkdir -p allosaurus-model && tar -xzf vendor/allosaurus-uni2005.tar.gz -C allosaurus-model
       - name: Install phone model into the allosaurus package
         run: |
           DEST="$(python -c 'import allosaurus,os;print(os.path.dirname(allosaurus.__file__))')/pretrained"
