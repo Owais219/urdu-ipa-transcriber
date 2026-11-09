@@ -14,7 +14,7 @@ permissions:
   contents: write
 
 env:
-  APP_VERSION: "0.3.0"
+  APP_VERSION: "0.4.0"
   WHISPER_MODEL: ${{ github.event.inputs.whisper_model || 'kingabzpro/whisper-large-v3-turbo-urdu' }}
   CT2_VERSION: "4.6.0"
 
@@ -83,6 +83,8 @@ jobs:
         with:
           name: whisper-urdu-ct2
           path: models/whisper-urdu-ct2
+      - name: Version is consistent
+        run: python -c "import urdu_ipa,os; v=urdu_ipa.__version__; assert v==os.environ['APP_VERSION'], v; print('version', v)"
       - name: Unit, pipeline and UI tests (source)
         run: python -m pytest -q -p no:cacheprovider -W ignore tests
       - name: Make a test recording with macOS speech (if a Hindi voice exists)
@@ -92,6 +94,15 @@ jobs:
           else
             echo "no Hindi voice on this runner; the self-test will use a synthetic signal"
           fi
+      - name: Make test audio files (WAV and M4A)
+        run: |
+          if [ -z "$WAV" ]; then
+            python -c "from urdu_ipa.selftest import _synthetic_word as s; import soundfile as sf; x,sr=s(); sf.write('word.wav',x,sr)"
+            echo "WAV=word.wav" >> "$GITHUB_ENV"
+          fi
+          cp word.wav "test_پھل.wav"
+          afconvert -f m4af -d aac word.wav word.m4a
+          ls -la word.* test_*
       - name: Self-test from source (real models)
         run: python -m urdu_ipa --selftest ${WAV:+--wav "$WAV"} --json selftest-source.json
       - name: Build app
@@ -107,6 +118,12 @@ jobs:
       - name: Self-test of the packaged app
         run: |
           "dist/Urdu IPA.app/Contents/MacOS/UrduIPA" --selftest ${WAV:+--wav "$WAV"} --json selftest-app.json
+      - name: Stress test of the real app window (record/process/redraw x30, plus M4A and WAV files)
+        env:
+          QT_QPA_PLATFORM: cocoa
+        run: |
+          "dist/Urdu IPA.app/Contents/MacOS/UrduIPA" --ui-stress 30 --wav word.wav --files "$PWD/word.m4a" "$PWD/test_پھل.wav" --json stress-app.json
+          ls ~/Library/Logs/DiagnosticReports/ 2>/dev/null | grep -i urdu && { echo "CRASH REPORT FOUND"; exit 1; } || echo "no crash reports"
       - name: Launch the real app window for 40 s (must not crash)
         env:
           QT_QPA_PLATFORM: cocoa
@@ -132,6 +149,8 @@ jobs:
           bash packaging/keep_whisper_model.sh "dist/Urdu IPA.app"
           "dist-lite/Urdu IPA.app/Contents/MacOS/UrduIPA" --selftest ${WAV:+--wav "$WAV"} --json selftest-lite.json
           python -c "import json;r=json.load(open('selftest-lite.json'));assert 'UrduIPA/models' in r['whisper_model_dir'], r['whisper_model_dir'];assert r['ok']"
+          QT_QPA_PLATFORM=cocoa "dist-lite/Urdu IPA.app/Contents/MacOS/UrduIPA" --ui-stress 10 --wav word.wav --files "$PWD/word.m4a" --json stress-lite.json
+          ls ~/Library/Logs/DiagnosticReports/ 2>/dev/null | grep -i urdu && { echo "CRASH REPORT FOUND"; exit 1; } || echo "no crash reports"
       - name: Make DMG
         run: |
           mkdir -p dmgroot
@@ -164,6 +183,7 @@ jobs:
           name: selftest-reports
           path: |
             selftest-*.json
+            stress-*.json
             ~/UrduIPA/logs/app.log
       - name: Publish release
         env:

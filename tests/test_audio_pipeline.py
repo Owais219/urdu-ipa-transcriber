@@ -472,3 +472,39 @@ def test_contradicting_audio_is_not_consistent():
     cfg = ReconcileConfig(evidence_standard="standard")
     r = _reconcile(["ʃ", "uː", "ʒ", "iː", "f"], ["pʰ", "ə", "l"], cfg=cfg)
     assert not r.reliable and r.phonetic is None
+
+
+def test_audio_io_formats(tmp_path):
+    import soundfile as sf
+    from urdu_ipa.audio_io import AudioFileError, expected_word_from_filename, load_audio
+    sf.write(tmp_path / "a.wav", np.stack([word_like(), word_like()], 1), 44100)
+    x, sr = load_audio(tmp_path / "a.wav")
+    assert x.ndim == 1 and sr == 44100
+    with pytest.raises(AudioFileError):
+        load_audio(tmp_path / "missing.wav")
+    (tmp_path / "bad.mp3").write_bytes(b"xx")
+    with pytest.raises(AudioFileError):
+        load_audio(tmp_path / "bad.mp3")
+    assert expected_word_from_filename("/x/جرگہ.m4a") == "جرگہ"
+    assert expected_word_from_filename("S01_جرگہ_2.wav") == "جرگہ"
+    assert expected_word_from_filename("jirga.wav") == ""
+
+
+def test_mp3_decoding_with_pyav(tmp_path):
+    av = pytest.importorskip("av")
+    import fractions
+    path = tmp_path / "w.mp3"
+    sig = (word_like() * 32767).astype(np.int16)
+    with av.open(str(path), "w") as c:
+        st = c.add_stream("mp3", rate=SR)
+        st.layout = "mono"
+        frame = av.AudioFrame.from_ndarray(sig.reshape(1, -1), format="s16", layout="mono")
+        frame.sample_rate = SR
+        frame.time_base = fractions.Fraction(1, SR)
+        for p in st.encode(frame):
+            c.mux(p)
+        for p in st.encode(None):
+            c.mux(p)
+    from urdu_ipa.audio_io import load_audio
+    x, sr = load_audio(path)
+    assert sr == SR and abs(len(x) - len(sig)) < 3000 and np.max(np.abs(x)) > 0.1

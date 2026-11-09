@@ -15,6 +15,7 @@ from urdu_ipa.pipeline import Pipeline
 from urdu_ipa.recorder import RecorderError, RecorderStatus
 from urdu_ipa.storage import Store
 from urdu_ipa.ui import MainWindow
+import numpy as np
 from tests.helpers import SR, FakeAcoustic, FakeASR, word_like
 
 
@@ -127,7 +128,7 @@ def test_repeated_recordings_stay_stable(app, tmp_path):
         w.start_recording()
         w.stop_recording()
         assert wait_until(lambda: w.state == w.IDLE and w.result is not None)
-    assert rec.starts == 8 and w.pool.activeThreadCount() == 0
+    assert rec.starts == 8 and w.engine.pool.activeThreadCount() == 0
     w.close()
 
 
@@ -174,7 +175,7 @@ def test_recording_blocked_while_models_load(app, tmp_path):
     assert not w.btn_record.isEnabled() and "Loading speech models" in w.lbl_state.text()
     w.start_recording()
     assert rec.starts == 0 and "still loading" in w.message.text()
-    w._models_loaded(0, {})
+    w._models_loaded({"errors": {}, "models": {}})
     assert w.btn_record.isEnabled()
     w.close()
 
@@ -196,4 +197,54 @@ def test_timeout_starts_only_when_job_runs(app, tmp_path):
     w.stop_recording()
     assert wait_until(lambda: w.result is not None)
     assert not w.timeout_timer.isActive()
+    w.close()
+
+
+def test_single_audio_file_uses_filename_as_expected_word(app, tmp_path, monkeypatch):
+    import soundfile as sf
+    from PySide6.QtWidgets import QFileDialog
+    f = tmp_path / "پھل.wav"
+    sf.write(f, word_like(), SR)
+    w, rec = make_window(tmp_path)
+    monkeypatch.setattr(QFileDialog, "getOpenFileNames", staticmethod(lambda *a, **k: ([str(f)], "")))
+    w.open_audio_files()
+    assert wait_until(lambda: w.state == w.IDLE and w.result is not None)
+    assert w.result.expected_word == "پھل" and w.result.phonetic == "[pʰəl]"
+    assert w.samples is not None and w.btn_replay.isEnabled() and w.btn_save.isEnabled()
+    assert rec.starts == 0
+    w.close()
+
+
+def test_batch_of_audio_files(app, tmp_path, monkeypatch):
+    import soundfile as sf
+    from PySide6.QtWidgets import QFileDialog
+    paths = []
+    for name, sig in (("پھل_1.wav", word_like()), ("پھل_2.flac", word_like()), ("silence.wav", np.zeros(SR))):
+        sf.write(tmp_path / name, sig, SR)
+        paths.append(str(tmp_path / name))
+    (tmp_path / "broken.wav").write_bytes(b"not audio")
+    paths.append(str(tmp_path / "broken.wav"))
+    w, rec = make_window(tmp_path)
+    monkeypatch.setattr(QFileDialog, "getOpenFileNames", staticmethod(lambda *a, **k: (paths, "")))
+    w.open_audio_files()
+    b = w.batch
+    assert b is not None
+    assert wait_until(lambda: b.current is None and b.idx >= 4, timeout=20)
+    sts = [r["result"].status if r["result"] is not None else "error" for r in b.rows]
+    assert sts == ["ok", "ok", "refused", "error"]
+    b.save_all()
+    assert len(w.store.rows()) == 3 and "file: پھل_1.wav" in w.store.rows()[0]["notes"]
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", staticmethod(lambda *a, **k: (str(tmp_path / "out.csv"), "")))
+    b.export_csv()
+    text = (tmp_path / "out.csv").read_text(encoding="utf-8-sig")
+    assert "[pʰəl]" in text and "broken.wav" in text
+    b.close()
+    assert wait_until(lambda: w.batch is None and w.state == w.IDLE)
+    w.close()
+
+
+def test_version_in_title(app, tmp_path):
+    from urdu_ipa import __version__
+    w, _ = make_window(tmp_path)
+    assert __version__ in w.windowTitle()
     w.close()

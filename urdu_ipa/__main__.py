@@ -30,7 +30,13 @@ def _setup_logging() -> str:
         sys.stdout = sys.stderr = f
     faulthandler.enable(f)
     logging.basicConfig(stream=f, level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-    logging.getLogger("urdu_ipa").info("start, python %s, frozen=%s, argv=%s", sys.version.split()[0], FROZEN, sys.argv)
+    from . import __version__
+    logging.getLogger("urdu_ipa").info("start, version %s, python %s, frozen=%s, argv=%s", __version__,
+                                       sys.version.split()[0], FROZEN, sys.argv)
+
+    def excepthook(tp, val, tb):          # unexpected Python errors in the window: log them, keep running
+        logging.getLogger("urdu_ipa").error("unhandled exception", exc_info=(tp, val, tb))
+    sys.excepthook = excepthook
     return str(path)
 
 
@@ -40,6 +46,9 @@ def main() -> int:
     if "--selftest" in sys.argv:
         from .selftest import run
         return run(sys.argv[sys.argv.index("--selftest") + 1:])
+    if "--ui-stress" in sys.argv:
+        from .selftest import run_ui_stress
+        return run_ui_stress(sys.argv[sys.argv.index("--ui-stress") + 1:])
     _setup_logging()
     from .ui import main as ui_main
     return ui_main([a for a in sys.argv[1:] if not a.startswith("-psn_")])   # Finder adds -psn_… on old macOS

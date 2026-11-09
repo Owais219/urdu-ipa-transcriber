@@ -14,7 +14,10 @@ do not have to download 1 GB again.
 
 2. Quit Urdu IPA if it is open.
 
-3. Drag "Urdu IPA" from this window onto Applications and choose "Replace".
+3. Drag "Urdu IPA" from THIS window ("Urdu IPA update") onto Applications and
+   choose "Replace". Make sure no other "Urdu IPA" disk image is open, so you
+   do not drag the old app by mistake. The new window title says
+   "Urdu IPA 0.4.0".
 
 4. Open the app. The first time, macOS may ask you to confirm it again:
    macOS 15: System Settings > Privacy & Security > "Open Anyway".

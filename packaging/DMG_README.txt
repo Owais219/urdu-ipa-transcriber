@@ -33,6 +33,17 @@ the result appears in under a second.
 With the expected-word box empty, the app first recognises the word with
 Whisper, which takes roughly 5-15 seconds per word on an Intel Mac.
 
+AUDIO FILES
+Click "Open Audio File(s)…" (or File > Open Audio Files…, Command-O) to transcribe
+recordings you already have: WAV, MP3, M4A, FLAC, AIFF or OGG, one word per file.
+Select several files at once for a batch; the results table can be saved to the
+dataset or exported as CSV. Name a file with the Urdu word (for example
+جہاد.m4a) and that name is used as the expected word (fast, no Whisper needed).
+
+WHICH VERSION AM I RUNNING?
+The version is shown in the window title ("Urdu IPA 0.4.0 ...") and in the
+status bar. Always start the app from Applications, not from the disk image.
+
 YOUR FILES
 Recordings, the dataset, your own lexicon entries (my_lexicon.tsv) and a log
 file are in the "UrduIPA" folder in your home folder. If something goes wrong,
